@@ -270,7 +270,7 @@ public:
  */
 class CRegTestParams : public CChainParams {
 public:
-    CRegTestParams() {
+    explicit CRegTestParams(const ArgsManager& args) {
         strNetworkID = "regtest";
         consensus.nSubsidyHalvingInterval = 150;
         consensus.BIP16Exception =  uint256S("0x31084fe36da4b52656a4be23f30c5fdd25304e3b0a937408fd389f62ac76beac"); // always enforce P2SH BIP16 on regtest
@@ -305,7 +305,7 @@ public:
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
-        nDefaultPort = 25565;
+        nDefaultPort = 1335;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
@@ -321,8 +321,8 @@ public:
         vSeeds.clear();      //!< Regtest mode doesn't have any DNS seeds.
 
         fDefaultConsistencyChecks = true;
-        fRequireStandard = false;
-        m_is_test_chain = false;
+        fRequireStandard = true;
+        m_is_test_chain = true;
 		
         checkpointData = {
             {
@@ -344,7 +344,6 @@ public:
 
         bech32_hrp = "rpic";
     }
-};
 
     /**
      * Allows modifying the Version Bits regtest parameters.
