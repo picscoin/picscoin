@@ -16,7 +16,7 @@
 #include <validation.h>
 
 #if defined(HAVE_CONFIG_H)
-#include <config/picscoin-config.h>
+#include <config/bitcoin-config.h>
 #endif
 
 #include <QAction>

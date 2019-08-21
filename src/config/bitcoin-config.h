@@ -51,7 +51,7 @@
 #define ENABLE_SSE41 1
 
 /* Define to 1 to enable wallet functions */
-/* #undef ENABLE_WALLET */
+#define ENABLE_WALLET 1
 
 /* Define to 1 to enable ZMQ functions */
 #define ENABLE_ZMQ 1
@@ -373,7 +373,7 @@
 #define LT_OBJDIR ".libs/"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "https://github.com/picscoin/picscoin/issues"
+#define PACKAGE_BUGREPORT "https://github.com/bitcoin/bitcoin/issues"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "Picscoin Core"
@@ -382,10 +382,10 @@
 #define PACKAGE_STRING "Picscoin Core 0.19.0rc1"
 
 /* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "picscoin"
+#define PACKAGE_TARNAME "bitcoin"
 
 /* Define to the home page for this package. */
-#define PACKAGE_URL "https://picscoins.org/"
+#define PACKAGE_URL "https://bitcoins.org/"
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "0.19.0rc1"
