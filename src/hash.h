@@ -1,244 +1,248 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
+// Copyright (c) 2013-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_HASH_H
-#define BITCOIN_HASH_H
-
+#include <hash.h>
 #include <crypto/common.h>
-#include <crypto/ripemd160.h>
-#include <crypto/sha256.h>
-#include <prevector.h>
-#include <serialize.h>
-#include <uint256.h>
-#include <crypto/common.h>
-#include <version.h>
+#include <crypto/hmac_sha512.h>
 
-#include <vector>
 
-typedef uint256 ChainCode;
-
-/** A hasher class for Picscoin's 256-bit hash (double SHA-256). */
-/** A hasher class for Bitcoin's 256-bit hash (double SHA-256). */
-class CHash256 {
-private:
-    CSHA256 sha;
-public:
-    static const size_t OUTPUT_SIZE = CSHA256::OUTPUT_SIZE;
-
-    void Finalize(unsigned char hash[OUTPUT_SIZE]) {
-        unsigned char buf[CSHA256::OUTPUT_SIZE];
-        sha.Finalize(buf);
-        sha.Reset().Write(buf, CSHA256::OUTPUT_SIZE).Finalize(hash);
-    }
-
-    CHash256& Write(const unsigned char *data, size_t len) {
-        sha.Write(data, len);
-        return *this;
-    }
-
-    CHash256& Reset() {
-        sha.Reset();
-        return *this;
-    }
-};
-
-/** A hasher class for Picscoin's 160-bit hash (SHA-256 + RIPEMD-160). */
-/** A hasher class for Bitcoin's 160-bit hash (SHA-256 + RIPEMD-160). */
-class CHash160 {
-private:
-    CSHA256 sha;
-public:
-    static const size_t OUTPUT_SIZE = CRIPEMD160::OUTPUT_SIZE;
-
-    void Finalize(unsigned char hash[OUTPUT_SIZE]) {
-        unsigned char buf[CSHA256::OUTPUT_SIZE];
-        sha.Finalize(buf);
-        CRIPEMD160().Write(buf, CSHA256::OUTPUT_SIZE).Finalize(hash);
-    }
-
-    CHash160& Write(const unsigned char *data, size_t len) {
-        sha.Write(data, len);
-        return *this;
-    }
-
-    CHash160& Reset() {
-        sha.Reset();
-        return *this;
-    }
-};
-
-/** Compute the 256-bit hash of an object. */
-template<typename T1>
-inline uint256 Hash(const T1 pbegin, const T1 pend)
+inline uint32_t ROTL32(uint32_t x, int8_t r)
 {
-    static const unsigned char pblank[1] = {};
-    uint256 result;
-    CHash256().Write(pbegin == pend ? pblank : (const unsigned char*)&pbegin[0], (pend - pbegin) * sizeof(pbegin[0]))
-              .Finalize((unsigned char*)&result);
-    return result;
+    return (x << r) | (x >> (32 - r));
 }
 
-/** Compute the 256-bit hash of the concatenation of two objects. */
-template<typename T1, typename T2>
-inline uint256 Hash(const T1 p1begin, const T1 p1end,
-                    const T2 p2begin, const T2 p2end) {
-    static const unsigned char pblank[1] = {};
-    uint256 result;
-    CHash256().Write(p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0]))
-              .Write(p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0]))
-              .Finalize((unsigned char*)&result);
-    return result;
+unsigned int MurmurHash3(unsigned int nHashSeed, const std::vector<unsigned char>& vDataToHash)
+{
+    // The following is MurmurHash3 (x86_32), see http://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp
+    uint32_t h1 = nHashSeed;
+    const uint32_t c1 = 0xcc9e2d51;
+    const uint32_t c2 = 0x1b873593;
+
+    const int nblocks = vDataToHash.size() / 4;
+
+    //----------
+    // body
+    const uint8_t* blocks = vDataToHash.data();
+
+    for (int i = 0; i < nblocks; ++i) {
+        uint32_t k1 = ReadLE32(blocks + i*4);
+
+        k1 *= c1;
+        k1 = ROTL32(k1, 15);
+        k1 *= c2;
+
+        h1 ^= k1;
+        h1 = ROTL32(h1, 13);
+        h1 = h1 * 5 + 0xe6546b64;
+    }
+
+    //----------
+    // tail
+    const uint8_t* tail = vDataToHash.data() + nblocks * 4;
+
+    uint32_t k1 = 0;
+
+    switch (vDataToHash.size() & 3) {
+        case 3:
+            k1 ^= tail[2] << 16;
+        case 2:
+            k1 ^= tail[1] << 8;
+        case 1:
+            k1 ^= tail[0];
+            k1 *= c1;
+            k1 = ROTL32(k1, 15);
+            k1 *= c2;
+            h1 ^= k1;
+    }
+
+    //----------
+    // finalization
+    h1 ^= vDataToHash.size();
+    h1 ^= h1 >> 16;
+    h1 *= 0x85ebca6b;
+    h1 ^= h1 >> 13;
+    h1 *= 0xc2b2ae35;
+    h1 ^= h1 >> 16;
+
+    return h1;
 }
 
-/** Compute the 160-bit hash an object. */
-template<typename T1>
-inline uint160 Hash160(const T1 pbegin, const T1 pend)
+void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, unsigned char header, const unsigned char data[32], unsigned char output[64])
 {
-    static unsigned char pblank[1] = {};
-    uint160 result;
-    CHash160().Write(pbegin == pend ? pblank : (const unsigned char*)&pbegin[0], (pend - pbegin) * sizeof(pbegin[0]))
-              .Finalize((unsigned char*)&result);
-    return result;
+    unsigned char num[4];
+    num[0] = (nChild >> 24) & 0xFF;
+    num[1] = (nChild >> 16) & 0xFF;
+    num[2] = (nChild >>  8) & 0xFF;
+    num[3] = (nChild >>  0) & 0xFF;
+    CHMAC_SHA512(chainCode.begin(), chainCode.size()).Write(&header, 1).Write(data, 32).Write(num, 4).Finalize(output);
 }
 
-/** Compute the 160-bit hash of a vector. */
-inline uint160 Hash160(const std::vector<unsigned char>& vch)
+#define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
+
+#define SIPROUND do { \
+    v0 += v1; v1 = ROTL(v1, 13); v1 ^= v0; \
+    v0 = ROTL(v0, 32); \
+    v2 += v3; v3 = ROTL(v3, 16); v3 ^= v2; \
+    v0 += v3; v3 = ROTL(v3, 21); v3 ^= v0; \
+    v2 += v1; v1 = ROTL(v1, 17); v1 ^= v2; \
+    v2 = ROTL(v2, 32); \
+} while (0)
+
+CSipHasher::CSipHasher(uint64_t k0, uint64_t k1)
 {
-    return Hash160(vch.begin(), vch.end());
+    v[0] = 0x736f6d6570736575ULL ^ k0;
+    v[1] = 0x646f72616e646f6dULL ^ k1;
+    v[2] = 0x6c7967656e657261ULL ^ k0;
+    v[3] = 0x7465646279746573ULL ^ k1;
+    count = 0;
+    tmp = 0;
 }
 
-/** Compute the 160-bit hash of a vector. */
-template<unsigned int N>
-inline uint160 Hash160(const prevector<N, unsigned char>& vch)
+CSipHasher& CSipHasher::Write(uint64_t data)
 {
-    return Hash160(vch.begin(), vch.end());
+    uint64_t v0 = v[0], v1 = v[1], v2 = v[2], v3 = v[3];
+
+    assert(count % 8 == 0);
+
+    v3 ^= data;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= data;
+
+    v[0] = v0;
+    v[1] = v1;
+    v[2] = v2;
+    v[3] = v3;
+
+    count += 8;
+    return *this;
 }
 
-/** A writer stream (for serialization) that computes a 256-bit hash. */
-class CHashWriter
+CSipHasher& CSipHasher::Write(const unsigned char* data, size_t size)
 {
-private:
-    CHash256 ctx;
+    uint64_t v0 = v[0], v1 = v[1], v2 = v[2], v3 = v[3];
+    uint64_t t = tmp;
+    int c = count;
 
-    const int nType;
-    const int nVersion;
-public:
-
-    CHashWriter(int nTypeIn, int nVersionIn) : nType(nTypeIn), nVersion(nVersionIn) {}
-
-    int GetType() const { return nType; }
-    int GetVersion() const { return nVersion; }
-
-    void write(const char *pch, size_t size) {
-        ctx.Write((const unsigned char*)pch, size);
-    }
-
-    // invalidates the object
-    uint256 GetHash() {
-        uint256 result;
-        ctx.Finalize((unsigned char*)&result);
-        return result;
-    }
-
-    /**
-     * Returns the first 64 bits from the resulting hash.
-     */
-    inline uint64_t GetCheapHash() {
-        unsigned char result[CHash256::OUTPUT_SIZE];
-        ctx.Finalize(result);
-        return ReadLE64(result);
-    }
-
-    template<typename T>
-    CHashWriter& operator<<(const T& obj) {
-        // Serialize to this stream
-        ::Serialize(*this, obj);
-        return (*this);
-    }
-};
-
-/** Reads data from an underlying stream, while hashing the read data. */
-template<typename Source>
-class CHashVerifier : public CHashWriter
-{
-private:
-    Source* source;
-
-public:
-    explicit CHashVerifier(Source* source_) : CHashWriter(source_->GetType(), source_->GetVersion()), source(source_) {}
-
-    void read(char* pch, size_t nSize)
-    {
-        source->read(pch, nSize);
-        this->write(pch, nSize);
-    }
-
-    void ignore(size_t nSize)
-    {
-        char data[1024];
-        while (nSize > 0) {
-            size_t now = std::min<size_t>(nSize, 1024);
-            read(data, now);
-            nSize -= now;
+    while (size--) {
+        t |= ((uint64_t)(*(data++))) << (8 * (c % 8));
+        c++;
+        if ((c & 7) == 0) {
+            v3 ^= t;
+            SIPROUND;
+            SIPROUND;
+            v0 ^= t;
+            t = 0;
         }
     }
 
-    template<typename T>
-    CHashVerifier<Source>& operator>>(T&& obj)
-    {
-        // Unserialize from this stream
-        ::Unserialize(*this, obj);
-        return (*this);
-    }
-};
+    v[0] = v0;
+    v[1] = v1;
+    v[2] = v2;
+    v[3] = v3;
+    count = c;
+    tmp = t;
 
-/** Compute the 256-bit hash of an object's serialization. */
-template<typename T>
-uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=PROTOCOL_VERSION)
-{
-    CHashWriter ss(nType, nVersion);
-    ss << obj;
-    return ss.GetHash();
+    return *this;
 }
 
-unsigned int MurmurHash3(unsigned int nHashSeed, const std::vector<unsigned char>& vDataToHash);
-
-void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, unsigned char header, const unsigned char data[32], unsigned char output[64]);
-
-/** SipHash-2-4 */
-class CSipHasher
+uint64_t CSipHasher::Finalize() const
 {
-private:
-    uint64_t v[4];
-    uint64_t tmp;
-    int count;
+    uint64_t v0 = v[0], v1 = v[1], v2 = v[2], v3 = v[3];
 
-public:
-    /** Construct a SipHash calculator initialized with 128-bit key (k0, k1) */
-    CSipHasher(uint64_t k0, uint64_t k1);
-    /** Hash a 64-bit integer worth of data
-     *  It is treated as if this was the little-endian interpretation of 8 bytes.
-     *  This function can only be used when a multiple of 8 bytes have been written so far.
-     */
-    CSipHasher& Write(uint64_t data);
-    /** Hash arbitrary bytes. */
-    CSipHasher& Write(const unsigned char* data, size_t size);
-    /** Compute the 64-bit SipHash-2-4 of the data written so far. The object remains untouched. */
-    uint64_t Finalize() const;
-};
+    uint64_t t = tmp | (((uint64_t)count) << 56);
 
-/** Optimized SipHash-2-4 implementation for uint256.
- *
- *  It is identical to:
- *    SipHasher(k0, k1)
- *      .Write(val.GetUint64(0))
- *      .Write(val.GetUint64(1))
- *      .Write(val.GetUint64(2))
- *      .Write(val.GetUint64(3))
- *      .Finalize()
- */
-uint64_t SipHashUint256(uint64_t k0, uint64_t k1, const uint256& val);
-uint64_t SipHashUint256Extra(uint64_t k0, uint64_t k1, const uint256& val, uint32_t extra);
+    v3 ^= t;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= t;
+    v2 ^= 0xFF;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    return v0 ^ v1 ^ v2 ^ v3;
+}
 
-#endif // BITCOIN_HASH_H
+uint64_t SipHashUint256(uint64_t k0, uint64_t k1, const uint256& val)
+{
+    /* Specialized implementation for efficiency */
+    uint64_t d = val.GetUint64(0);
+
+    uint64_t v0 = 0x736f6d6570736575ULL ^ k0;
+    uint64_t v1 = 0x646f72616e646f6dULL ^ k1;
+    uint64_t v2 = 0x6c7967656e657261ULL ^ k0;
+    uint64_t v3 = 0x7465646279746573ULL ^ k1 ^ d;
+
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val.GetUint64(1);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val.GetUint64(2);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val.GetUint64(3);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    v3 ^= ((uint64_t)4) << 59;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= ((uint64_t)4) << 59;
+    v2 ^= 0xFF;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    return v0 ^ v1 ^ v2 ^ v3;
+}
+
+uint64_t SipHashUint256Extra(uint64_t k0, uint64_t k1, const uint256& val, uint32_t extra)
+{
+    /* Specialized implementation for efficiency */
+    uint64_t d = val.GetUint64(0);
+
+    uint64_t v0 = 0x736f6d6570736575ULL ^ k0;
+    uint64_t v1 = 0x646f72616e646f6dULL ^ k1;
+    uint64_t v2 = 0x6c7967656e657261ULL ^ k0;
+    uint64_t v3 = 0x7465646279746573ULL ^ k1 ^ d;
+
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val.GetUint64(1);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val.GetUint64(2);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val.GetUint64(3);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = (((uint64_t)36) << 56) | extra;
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    v2 ^= 0xFF;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    return v0 ^ v1 ^ v2 ^ v3;
+}
+
