@@ -232,7 +232,7 @@ bool Intro::pickDataDirectory(interfaces::Node& node)
     }
     /* Only override -datadir if different from the default, to make it possible to
      * override -datadir in the picscoin.conf file in the default data directory
-     * (to be consistent with picscoind behavior)
+     * (to be consistent with bitcoind behavior)
      */
     if(dataDir != GUIUtil::getDefaultDataDirectory()) {
         node.softSetArg("-datadir", GUIUtil::qstringToBoostPath(dataDir).string()); // use OS locale for path setting

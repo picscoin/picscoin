@@ -9,7 +9,7 @@
 #include <string>
 
 /**
- * CBaseChainParams defines the base parameters (shared between picscoin-cli and picscoind)
+ * CBaseChainParams defines the base parameters (shared between picscoin-cli and bitcoind)
  * of a given instance of the Picscoin system.
  */
 class CBaseChainParams

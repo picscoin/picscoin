@@ -34,7 +34,7 @@ namespace interfaces {
 class Handler;
 class Wallet;
 
-//! Top-level interface for a picscoin node (picscoind process).
+//! Top-level interface for a picscoin node (bitcoind process).
 class Node
 {
 public:

@@ -82,7 +82,7 @@ TESTS =
 BENCHMARKS =
 
 if BUILD_BITCOIND
-  bin_PROGRAMS += picscoind
+  bin_PROGRAMS += bitcoind
 endif
 
 if BUILD_BITCOIN_CLI
@@ -249,7 +249,7 @@ obj/build.h: FORCE
 	  "$(abs_top_srcdir)"
 libpicscoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-# server: shared between picscoind and picscoin-qt
+# server: shared between bitcoind and picscoin-qt
 # Contains code accessing mempool and chain state that is meant to be separated
 # from wallet and gui code (see node/README.md). Shared code should go in
 # libpicscoin_common or libpicscoin_util libraries, instead.
@@ -321,7 +321,7 @@ libpicscoin_zmq_a_SOURCES = \
 endif
 
 
-# wallet: shared between picscoind and picscoin-qt, but only linked
+# wallet: shared between bitcoind and picscoin-qt, but only linked
 # when wallet enabled
 libpicscoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libpicscoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -438,7 +438,7 @@ libpicscoin_consensus_a_SOURCES = \
   util/strencodings.h \
   version.h
 
-# common: shared between picscoind, and picscoin-qt and non-server tools
+# common: shared between bitcoind, and picscoin-qt and non-server tools
 libpicscoin_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libpicscoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libpicscoin_common_a_SOURCES = \
@@ -521,19 +521,19 @@ libpicscoin_cli_a_SOURCES = \
 nodist_libpicscoin_util_a_SOURCES = $(srcdir)/obj/build.h
 #
 
-# picscoind binary #
-picscoind_SOURCES = picscoind.cpp
-picscoind_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-picscoind_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-picscoind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+# bitcoind binary #
+bitcoind_SOURCES = bitcoind.cpp
+bitcoind_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+bitcoind_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+bitcoind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-picscoind_SOURCES += picscoind-res.rc
+bitcoind_SOURCES += bitcoind-res.rc
 endif
 
 # Libraries below may be listed more than once to resolve circular dependencies (see
 # https://eli.thegreenplace.net/2013/07/09/library-order-in-static-linking#circular-dependency)
-picscoind_LDADD = \
+bitcoind_LDADD = \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_SERVER) \
@@ -548,7 +548,7 @@ picscoind_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-picscoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 
 # picscoin-cli binary #
 picscoin_cli_SOURCES = picscoin-cli.cpp
