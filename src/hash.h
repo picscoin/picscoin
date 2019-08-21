@@ -1,6 +1,4 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2019 The Bitcoin Core developers
-// Copyright (c) 2019 The Picscoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,6 +11,7 @@
 #include <prevector.h>
 #include <serialize.h>
 #include <uint256.h>
+#include <crypto/common.h>
 #include <version.h>
 
 #include <vector>
@@ -20,6 +19,7 @@
 typedef uint256 ChainCode;
 
 /** A hasher class for Picscoin's 256-bit hash (double SHA-256). */
+/** A hasher class for Bitcoin's 256-bit hash (double SHA-256). */
 class CHash256 {
 private:
     CSHA256 sha;
@@ -44,6 +44,7 @@ public:
 };
 
 /** A hasher class for Picscoin's 160-bit hash (SHA-256 + RIPEMD-160). */
+/** A hasher class for Bitcoin's 160-bit hash (SHA-256 + RIPEMD-160). */
 class CHash160 {
 private:
     CSHA256 sha;
@@ -204,5 +205,40 @@ uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=PROTOCOL
 unsigned int MurmurHash3(unsigned int nHashSeed, const std::vector<unsigned char>& vDataToHash);
 
 void BIP32Hash(const ChainCode &chainCode, unsigned int nChild, unsigned char header, const unsigned char data[32], unsigned char output[64]);
+
+/** SipHash-2-4 */
+class CSipHasher
+{
+private:
+    uint64_t v[4];
+    uint64_t tmp;
+    int count;
+
+public:
+    /** Construct a SipHash calculator initialized with 128-bit key (k0, k1) */
+    CSipHasher(uint64_t k0, uint64_t k1);
+    /** Hash a 64-bit integer worth of data
+     *  It is treated as if this was the little-endian interpretation of 8 bytes.
+     *  This function can only be used when a multiple of 8 bytes have been written so far.
+     */
+    CSipHasher& Write(uint64_t data);
+    /** Hash arbitrary bytes. */
+    CSipHasher& Write(const unsigned char* data, size_t size);
+    /** Compute the 64-bit SipHash-2-4 of the data written so far. The object remains untouched. */
+    uint64_t Finalize() const;
+};
+
+/** Optimized SipHash-2-4 implementation for uint256.
+ *
+ *  It is identical to:
+ *    SipHasher(k0, k1)
+ *      .Write(val.GetUint64(0))
+ *      .Write(val.GetUint64(1))
+ *      .Write(val.GetUint64(2))
+ *      .Write(val.GetUint64(3))
+ *      .Finalize()
+ */
+uint64_t SipHashUint256(uint64_t k0, uint64_t k1, const uint256& val);
+uint64_t SipHashUint256Extra(uint64_t k0, uint64_t k1, const uint256& val, uint32_t extra);
 
 #endif // BITCOIN_HASH_H
